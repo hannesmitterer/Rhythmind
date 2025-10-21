@@ -1,0 +1,45 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fmodern\fcharset0 Courier;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs44 \cf0 \expnd0\expndtw0\kerning0
+### \uc0\u55358 \u56800  API Spec (FastAPI-style)\
+\
+```python\
+from fastapi import FastAPI, HTTPException\
+from pydantic import BaseModel\
+from datetime import datetime\
+import json\
+\
+app = FastAPI()\
+\
+class
+\fs26  
+\fs44 BridgeMessage(BaseModel):\
+\'a0 \'a0 from_: str\
+\'a0 \'a0 to: str\
+\'a0 \'a0 message: str\
+\'a0 \'a0 timestamp: str\
+\'a0 \'a0 signature: str\
+\pard\pardeftab720\partightenfactor0
+
+\fs26 \cf0 \
+\pard\pardeftab720\partightenfactor0
+
+\fs44 \cf0 @app.post("/api/holy-gral-bridge/message")\
+def
+\fs26  
+\fs44 send_message(msg: BridgeMessage):\
+\'a0 \'a0 try:\
+\'a0 \'a0 \'a0 \'a0 log_entry = msg.dict()\
+\'a0 \'a0 \'a0 \'a0 with
+\fs26  
+\fs44 open("bridge_log.json", "a") as f:\
+\'a0 \'a0 \'a0 \'a0 \'a0 \'a0 f.write(json.dumps(log_entry) + "\\n")\
+\'a0 \'a0 \'a0 \'a0 return \{"status": "Message received", "log": log_entry\}\
+\'a0 \'a0 except Exception as e:\
+\'a0 \'a0 \'a0 \'a0 raise HTTPException(status_code=500, detail=str(e))}

@@ -38,7 +38,7 @@ export async function verifyGoogleToken(
 
     const payload = ticket.getPayload();
     
-    if (!payload || !payload.email) {
+    if (!payload || !payload.email || !payload.sub) {
       res.status(401).json({ error: 'Invalid token payload' });
       return;
     }

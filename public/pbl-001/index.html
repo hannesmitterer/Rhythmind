@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PBL-001: Google Sign-In Gateway</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #333;
+    }
+    
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      max-width: 600px;
+      width: 90%;
+    }
+    
+    h1 {
+      color: #667eea;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    
+    .sign-in-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    
+    #user-info {
+      display: none;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f0f4ff;
+      border-radius: 8px;
+      width: 100%;
+    }
+    
+    #user-info.visible {
+      display: block;
+    }
+    
+    .user-detail {
+      margin: 0.5rem 0;
+      font-size: 0.9rem;
+    }
+    
+    .user-detail strong {
+      color: #667eea;
+    }
+    
+    .actions {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .actions.visible {
+      display: flex;
+    }
+    
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-secondary {
+      background: #764ba2;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background: #633d8a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4);
+    }
+    
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+    
+    .response {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .response.success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    
+    .response.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(102, 126, 234, 0.3);
+      border-radius: 50%;
+      border-top-color: #667eea;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 PBL-001: Authentication Gateway</h1>
+    <p class="subtitle">Sign in with Google to access protected endpoints</p>
+    
+    <div class="sign-in-section">
+      <div id="g_id_onload"
+           data-client_id="YOUR_GOOGLE_CLIENT_ID"
+           data-callback="handleCredentialResponse">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-size="large"
+           data-theme="outline"
+           data-text="sign_in_with"
+           data-shape="rectangular"
+           data-logo_alignment="left">
+      </div>
+    </div>
+    
+    <div id="user-info">
+      <h3>Signed in as:</h3>
+      <div class="user-detail"><strong>Email:</strong> <span id="user-email"></span></div>
+      <div class="user-detail"><strong>Name:</strong> <span id="user-name"></span></div>
+    </div>
+    
+    <div class="actions" id="actions">
+      <button class="btn btn-primary" onclick="testSFI()">
+        Test GET /sfi (Council)
+      </button>
+      <button class="btn btn-primary" onclick="testMCLLive()">
+        Test GET /mcl/live (Council)
+      </button>
+      <button class="btn btn-secondary" onclick="testAllocations()">
+        Test POST /allocations (Seedbringer)
+      </button>
+      <button class="btn btn-danger" onclick="signOut()">
+        Sign Out
+      </button>
+    </div>
+    
+    <div id="response"></div>
+  </div>
+
+  <script>
+    let idToken = null;
+    const API_BASE = window.location.origin;
+    
+    // Handle Google Sign-In callback
+    function handleCredentialResponse(response) {
+      idToken = response.credential;
+      
+      // Decode JWT to get user info (basic decoding, not verification)
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      
+      document.getElementById('user-email').textContent = payload.email;
+      document.getElementById('user-name').textContent = payload.name || 'N/A';
+      document.getElementById('user-info').classList.add('visible');
+      document.getElementById('actions').classList.add('visible');
+      
+      showResponse('Successfully signed in!', 'success');
+    }
+    
+    // Make authenticated API request
+    async function makeAuthRequest(method, endpoint, body = null) {
+      if (!idToken) {
+        showResponse('Please sign in first', 'error');
+        return;
+      }
+      
+      const responseDiv = document.getElementById('response');
+      responseDiv.innerHTML = '<div class="loading"></div> Loading...';
+      
+      try {
+        const options = {
+          method,
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        };
+        
+        if (body) {
+          options.body = JSON.stringify(body);
+        }
+        
+        const response = await fetch(`${API_BASE}${endpoint}`, options);
+        const data = await response.json();
+        
+        if (response.ok) {
+          showResponse(JSON.stringify(data, null, 2), 'success');
+        } else {
+          showResponse(`Error ${response.status}: ${JSON.stringify(data, null, 2)}`, 'error');
+        }
+      } catch (error) {
+        showResponse(`Network error: ${error.message}`, 'error');
+      }
+    }
+    
+    // Test endpoints
+    function testSFI() {
+      makeAuthRequest('GET', '/sfi');
+    }
+    
+    function testMCLLive() {
+      makeAuthRequest('GET', '/mcl/live');
+    }
+    
+    function testAllocations() {
+      const payload = {
+        allocation: 'test-allocation',
+        amount: 1000,
+        timestamp: new Date().toISOString()
+      };
+      makeAuthRequest('POST', '/allocations', payload);
+    }
+    
+    // Sign out
+    function signOut() {
+      idToken = null;
+      document.getElementById('user-info').classList.remove('visible');
+      document.getElementById('actions').classList.remove('visible');
+      document.getElementById('response').innerHTML = '';
+      
+      // Reload to reset Google Sign-In
+      window.location.reload();
+    }
+    
+    // Show response
+    function showResponse(message, type) {
+      const responseDiv = document.getElementById('response');
+      responseDiv.className = `response ${type}`;
+      responseDiv.innerHTML = `<pre>${message}</pre>`;
+    }
+    
+    // Note: Replace YOUR_GOOGLE_CLIENT_ID with actual client ID
+    window.addEventListener('DOMContentLoaded', () => {
+      const clientIdElement = document.querySelector('#g_id_onload');
+      const clientId = clientIdElement.getAttribute('data-client_id');
+      
+      if (clientId === 'YOUR_GOOGLE_CLIENT_ID') {
+        showResponse('⚠️ Please configure GOOGLE_CLIENT_ID in the HTML file and backend .env', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
